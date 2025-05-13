@@ -37,7 +37,6 @@ cosine_sim = get_similarity_matrix(df)
 # FUNGSI REKOMENDASI
 # -----------------------------
 def recommend_places(kata_kunci, min_rating=0, min_harga=0, max_harga=float('inf'), top_n=5):
-    # Cari baris paling mirip dengan kata kunci
     idx = df[df['Nama Wisata'].str.contains(kata_kunci, case=False, na=False)]
     if idx.empty:
         return pd.DataFrame(), []
@@ -45,7 +44,7 @@ def recommend_places(kata_kunci, min_rating=0, min_harga=0, max_harga=float('inf
 
     sim_scores = list(enumerate(cosine_sim[idx]))
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    sim_scores = sim_scores[1:]  # Skip diri sendiri
+    sim_scores = sim_scores[1:]
 
     recommended = []
     relevance_ground_truth = []
@@ -53,7 +52,6 @@ def recommend_places(kata_kunci, min_rating=0, min_harga=0, max_harga=float('inf
     for i in sim_scores:
         place = df.iloc[i[0]]
 
-        # Filter rating dan harga
         if place['Rating'] < min_rating:
             continue
         if not (min_harga <= place['Harga'] <= max_harga):
@@ -72,6 +70,52 @@ def recommend_places(kata_kunci, min_rating=0, min_harga=0, max_harga=float('inf
             break
 
     return pd.DataFrame(recommended), relevance_ground_truth
+
+# -----------------------------
+# EVALUASI LANJUTAN
+# -----------------------------
+def precision_at_k(relevance, k):
+    relevance = np.array(relevance)[:k]
+    if relevance.size == 0:
+        return 0.0
+    return np.sum(relevance) / k
+
+def average_precision(relevance):
+    relevance = np.array(relevance)
+    if np.sum(relevance) == 0:
+        return 0.0
+    score = 0.0
+    hit_count = 0
+    for i, rel in enumerate(relevance):
+        if rel:
+            hit_count += 1
+            score += hit_count / (i + 1)
+    return score / np.sum(relevance)
+
+def dcg_at_k(relevance, k):
+    relevance = np.array(relevance)[:k]
+    if relevance.size == 0:
+        return 0.0
+    return np.sum((2 ** relevance - 1) / np.log2(np.arange(2, relevance.size + 2)))
+
+def ndcg_at_k(relevance, k):
+    actual_dcg = dcg_at_k(relevance, k)
+    ideal_relevance = sorted(relevance, reverse=True)
+    ideal_dcg = dcg_at_k(ideal_relevance, k)
+    if ideal_dcg == 0:
+        return 0.0
+    return actual_dcg / ideal_dcg
+
+def evaluate_recommendation(relevance_list, k=5):
+    p_at_k = precision_at_k(relevance_list, k)
+    ap = average_precision(relevance_list)
+    ndcg = ndcg_at_k(relevance_list, k)
+
+    return {
+        f'Precision@{k}': round(p_at_k, 3),
+        'MAP': round(ap, 3),
+        f'NDCG@{k}': round(ndcg, 3)
+    }
 
 # -----------------------------
 # STREAMLIT UI
@@ -95,12 +139,19 @@ if st.button("Cari Rekomendasi"):
             st.success(f"{len(hasil)} tempat wisata direkomendasikan.")
             st.dataframe(hasil)
 
-            # Precision & Recall Evaluation (simulasi)
+            # Precision & Recall sederhana
             relevan = sum(ground_truth)
             total = len(ground_truth)
             precision = relevan / total if total > 0 else 0
-            recall = relevan / (relevan + 1e-5)  # Hindari div 0
+            recall = relevan / (relevan + 1e-5)
 
-            st.subheader("📊 Evaluasi Rekomendasi")
+            st.subheader("📊 Evaluasi Rekomendasi (Sederhana)")
             st.write(f"**Precision**: {precision:.2f}")
             st.write(f"**Recall**: {recall:.2f}")
+
+            # Evaluasi lanjutan
+            st.subheader("📊 Evaluasi Rekomendasi (Lanjutan)")
+            eval_result = evaluate_recommendation(ground_truth, top_n)
+            for metric, score in eval_result.items():
+                st.write(f"**{metric}**: {score}")
+
