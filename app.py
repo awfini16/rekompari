@@ -120,7 +120,7 @@ def evaluate_recommendation(relevance_list, k=5):
 # -----------------------------
 # STREAMLIT UI
 # -----------------------------
-st.title("🎯 Sistem Rekomendasi Tempat Wisata - Jawa Timur")
+st.title(" Sistem Rekomendasi Tempat Wisata - Jawa Timur")
 
 kata_kunci = st.text_input("Masukkan kata kunci/nama tempat wisata (misal: 'Papuma')", "")
 min_rating = st.slider("Filter minimal rating", 0.0, 5.0, 0.0, 0.5)
@@ -145,13 +145,13 @@ if st.button("Cari Rekomendasi"):
             precision = relevan / total if total > 0 else 0
             recall = relevan / (relevan + 1e-5)
 
-            st.subheader("📊 Evaluasi Rekomendasi (Sederhana)")
+            st.subheader(" Evaluasi Rekomendasi")
             st.write(f"**Precision**: {precision:.2f}")
             st.write(f"**Recall**: {recall:.2f}")
 
             # Evaluasi lanjutan
-            st.subheader("📊 Evaluasi Rekomendasi (Lanjutan)")
-            eval_result = evaluate_recommendation(ground_truth, top_n)
-            for metric, score in eval_result.items():
-                st.write(f"**{metric}**: {score}")
+            #st.subheader("📊 Evaluasi Rekomendasi (Lanjutan)")
+            #eval_result = evaluate_recommendation(ground_truth, top_n)
+            #for metric, score in eval_result.items():
+            #   st.write(f"**{metric}**: {score}")
 
