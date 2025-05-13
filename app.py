@@ -19,16 +19,6 @@ def load_data():
     df['Tiket Masuk Weekend'] = pd.to_numeric(df['Tiket Masuk Weekend'], errors='coerce').fillna(0)
     df['Harga'] = ((df['Tiket Masuk Weekday'] + df['Tiket Masuk Weekend']) / 2).astype(int)
 
-    # Deteksi kota semi otomatis
-    daftar_kota = ['Jember', 'Malang', 'Batu']
-    def deteksi_kota(lokasi):
-        for kota in daftar_kota:
-            if re.search(r'\b{}\b'.format(re.escape(kota)), lokasi, re.IGNORECASE):
-                return kota
-        return 'Tidak Diketahui'
-
-    df['Kota'] = df['Lokasi'].apply(deteksi_kota)
-
     return df
 
 df = load_data()
@@ -46,7 +36,7 @@ cosine_sim = get_similarity_matrix(df)
 # -----------------------------
 # FUNGSI REKOMENDASI
 # -----------------------------
-def recommend_places(kata_kunci, kota_filter=None, min_rating=0, min_harga=0, max_harga=float('inf'), top_n=5):
+def recommend_places(kata_kunci, min_rating=0, min_harga=0, max_harga=float('inf'), top_n=5):
     # Cari baris paling mirip dengan kata kunci
     idx = df[df['Nama Wisata'].str.contains(kata_kunci, case=False, na=False)]
     if idx.empty:
@@ -63,11 +53,6 @@ def recommend_places(kata_kunci, kota_filter=None, min_rating=0, min_harga=0, ma
     for i in sim_scores:
         place = df.iloc[i[0]]
 
-        # Filter kota yang lebih presisi (berbasis kolom 'Kota')
-        if kota_filter:
-            if kota_filter.lower() != place['Kota'].lower():
-                continue
-
         # Filter rating dan harga
         if place['Rating'] < min_rating:
             continue
@@ -76,7 +61,6 @@ def recommend_places(kata_kunci, kota_filter=None, min_rating=0, min_harga=0, ma
 
         recommended.append({
             "Nama Wisata": place['Nama Wisata'],
-            "Kota": place['Kota'],
             "Lokasi": place['Lokasi'],
             "Deskripsi": place['Deskripsi'],
             "Rating": place['Rating'],
@@ -95,7 +79,6 @@ def recommend_places(kata_kunci, kota_filter=None, min_rating=0, min_harga=0, ma
 st.title("🎯 Sistem Rekomendasi Tempat Wisata - Jawa Timur")
 
 kata_kunci = st.text_input("Masukkan kata kunci/nama tempat wisata (misal: 'Papuma')", "")
-kota_filter = st.selectbox("Filter kota (opsional)", [''] + sorted(df['Kota'].unique()))
 min_rating = st.slider("Filter minimal rating", 0.0, 5.0, 0.0, 0.5)
 min_harga = st.number_input("Filter harga minimal", 0, 1000000, 0, 1000)
 max_harga = st.number_input("Filter harga maksimal", 0, 1000000, 1000000, 1000)
@@ -105,7 +88,7 @@ if st.button("Cari Rekomendasi"):
     if not kata_kunci:
         st.warning("Silakan masukkan kata kunci terlebih dahulu.")
     else:
-        hasil, ground_truth = recommend_places(kata_kunci, kota_filter if kota_filter else None, min_rating, min_harga, max_harga, top_n)
+        hasil, ground_truth = recommend_places(kata_kunci, min_rating, min_harga, max_harga, top_n)
         if hasil.empty:
             st.error("Tempat tidak ditemukan. Coba kata kunci atau filter lain.")
         else:
