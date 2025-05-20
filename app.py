@@ -163,6 +163,6 @@ if st.button("Cari Rekomendasi"):
             #st.write(f"**Recall**: {recall:.2f}")
 
             # Evaluasi lanjutan (MAP, NDCG, dll)
-            eval_result = evaluate_recommendation(ground_truth, top_n)
-            for metric, score in eval_result.items():
-                st.write(f"**{metric}**: {score}")
+            #eval_result = evaluate_recommendation(ground_truth, top_n)
+            #for metric, score in eval_result.items():
+                #st.write(f"**{metric}**: {score}")
