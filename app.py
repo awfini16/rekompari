@@ -4,6 +4,8 @@ import numpy as np
 import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import MinMaxScaler
+from scipy.sparse import hstack
 
 # -----------------------------
 # LOAD DAN CLEAN DATASET
@@ -11,25 +13,34 @@ from sklearn.metrics.pairwise import cosine_similarity
 @st.cache_data
 def load_data():
     df = pd.read_csv("datasetku.csv", encoding='latin-1')
-
-    # Cleaning data
     df['Deskripsi'] = df['Deskripsi'].fillna('')
     df['Rating'] = df['Rating'].str.replace(',', '.').astype(float)
     df['Tiket Masuk Weekday'] = pd.to_numeric(df['Tiket Masuk Weekday'], errors='coerce').fillna(0)
     df['Tiket Masuk Weekend'] = pd.to_numeric(df['Tiket Masuk Weekend'], errors='coerce').fillna(0)
     df['Harga'] = ((df['Tiket Masuk Weekday'] + df['Tiket Masuk Weekend']) / 2).astype(int)
-
     return df
 
 df = load_data()
 
 # -----------------------------
-# FITUR: TF-IDF dan SIMILARITY
+# HYBRID SIMILARITY: TF-IDF + Rating + Harga
 # -----------------------------
 def get_similarity_matrix(df):
     tfidf = TfidfVectorizer()
     tfidf_matrix = tfidf.fit_transform(df['Deskripsi'])
-    return cosine_similarity(tfidf_matrix)
+
+    scaler = MinMaxScaler()
+    numeric_features = scaler.fit_transform(df[['Rating', 'Harga']])
+
+    # Bobot fitur
+    teks_weight = 0.5
+    rating_weight = 0.3
+    harga_weight = 0.2
+
+    numeric_weighted = numeric_features * [rating_weight, harga_weight]
+    combined_features = hstack([tfidf_matrix * teks_weight, numeric_weighted])
+
+    return cosine_similarity(combined_features)
 
 cosine_sim = get_similarity_matrix(df)
 
@@ -72,7 +83,7 @@ def recommend_places(kata_kunci, min_rating=0, min_harga=0, max_harga=float('inf
     return pd.DataFrame(recommended), relevance_ground_truth
 
 # -----------------------------
-# EVALUASI LANJUTAN
+# METRIK EVALUASI
 # -----------------------------
 def precision_at_k(relevance, k):
     relevance = np.array(relevance)[:k]
@@ -120,7 +131,7 @@ def evaluate_recommendation(relevance_list, k=5):
 # -----------------------------
 # STREAMLIT UI
 # -----------------------------
-st.title(" Sistem Rekomendasi Tempat Wisata - Jawa Timur")
+st.title("🗺️ Sistem Rekomendasi Tempat Wisata - Jawa Timur")
 
 kata_kunci = st.text_input("Masukkan kata kunci/nama tempat wisata (misal: 'Papuma')", "")
 min_rating = st.slider("Filter minimal rating", 0.0, 5.0, 0.0, 0.5)
@@ -139,30 +150,15 @@ if st.button("Cari Rekomendasi"):
             st.success(f"{len(hasil)} tempat wisata direkomendasikan.")
             st.dataframe(hasil)
 
-            # Fungsi rata-rata similarity score
-            def average_similarity_score(df_hasil):
-                if "Skor Kemiripan" in df_hasil.columns and not df_hasil.empty:
-                    return round(df_hasil["Skor Kemiripan"].mean(), 3)
-                return 0.0
-
-            avg_score = average_similarity_score(hasil)
-            st.info(f"🔍 Rata-rata Skor Kemiripan: {avg_score}")
-
-            # Visualisasi bar chart skor kemiripan
-            st.subheader("📊 Visualisasi Skor Kemiripan")
-            st.bar_chart(hasil.set_index("Nama Wisata")["Skor Kemiripan"])
-
-            # Precision & Recall sederhana
             relevan = sum(ground_truth)
             total = len(ground_truth)
             precision = relevan / total if total > 0 else 0
             recall = relevan / (relevan + 1e-5)
 
-            st.subheader("📈 Evaluasi Rekomendasi")
+            st.subheader("📊 Evaluasi Rekomendasi")
             st.write(f"**Precision**: {precision:.2f}")
             st.write(f"**Recall**: {recall:.2f}")
 
-            # Evaluasi lanjutan (MAP, NDCG, dll)
             eval_result = evaluate_recommendation(ground_truth, top_n)
             for metric, score in eval_result.items():
                 st.write(f"**{metric}**: {score}")
