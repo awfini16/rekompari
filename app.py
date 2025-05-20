@@ -2,12 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import re
-import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import MinMaxScaler
-from scipy.sparse import hstack
 
 # -----------------------------
 # LOAD DAN CLEAN DATASET
@@ -15,34 +11,25 @@ from scipy.sparse import hstack
 @st.cache_data
 def load_data():
     df = pd.read_csv("datasetku.csv", encoding='latin-1')
+
+    # Cleaning data
     df['Deskripsi'] = df['Deskripsi'].fillna('')
     df['Rating'] = df['Rating'].str.replace(',', '.').astype(float)
     df['Tiket Masuk Weekday'] = pd.to_numeric(df['Tiket Masuk Weekday'], errors='coerce').fillna(0)
     df['Tiket Masuk Weekend'] = pd.to_numeric(df['Tiket Masuk Weekend'], errors='coerce').fillna(0)
     df['Harga'] = ((df['Tiket Masuk Weekday'] + df['Tiket Masuk Weekend']) / 2).astype(int)
+
     return df
 
 df = load_data()
 
 # -----------------------------
-# HYBRID SIMILARITY: TF-IDF + Rating + Harga
+# FITUR: TF-IDF dan SIMILARITY
 # -----------------------------
 def get_similarity_matrix(df):
     tfidf = TfidfVectorizer()
     tfidf_matrix = tfidf.fit_transform(df['Deskripsi'])
-
-    scaler = MinMaxScaler()
-    numeric_features = scaler.fit_transform(df[['Rating', 'Harga']])
-
-    # Bobot fitur
-    teks_weight = 0.5
-    rating_weight = 0.3
-    harga_weight = 0.2
-
-    numeric_weighted = numeric_features * [rating_weight, harga_weight]
-    combined_features = hstack([tfidf_matrix * teks_weight, numeric_weighted])
-
-    return cosine_similarity(combined_features)
+    return cosine_similarity(tfidf_matrix)
 
 cosine_sim = get_similarity_matrix(df)
 
@@ -85,7 +72,7 @@ def recommend_places(kata_kunci, min_rating=0, min_harga=0, max_harga=float('inf
     return pd.DataFrame(recommended), relevance_ground_truth
 
 # -----------------------------
-# METRIK EVALUASI
+# EVALUASI LANJUTAN
 # -----------------------------
 def precision_at_k(relevance, k):
     relevance = np.array(relevance)[:k]
@@ -130,22 +117,10 @@ def evaluate_recommendation(relevance_list, k=5):
         f'NDCG@{k}': round(ndcg, 3)
     }
 
-
-def plot_similarity(scores, labels):
-    fig, ax = plt.subplots(figsize=(10, 1.5))
-    sns.heatmap([scores], annot=True, fmt=".3f", cmap="YlGnBu", cbar=True, xticklabels=labels, ax=ax)
-    ax.set_title("Skor Kemiripan Tempat Rekomendasi", fontsize=14)
-    ax.set_yticks([])
-    plt.xticks(rotation=30, ha='right')
-    return fig
-
-
 # -----------------------------
 # STREAMLIT UI
 # -----------------------------
-# ... kode kamu sebelumnya tetap sama sampai bagian Streamlit UI
-
-st.title("🗺️ Sistem Rekomendasi Tempat Wisata - Jawa Timur")
+st.title(" Sistem Rekomendasi Tempat Wisata - Jawa Timur")
 
 kata_kunci = st.text_input("Masukkan kata kunci/nama tempat wisata (misal: 'Papuma')", "")
 min_rating = st.slider("Filter minimal rating", 0.0, 5.0, 0.0, 0.5)
@@ -153,21 +128,41 @@ min_harga = st.number_input("Filter harga minimal", 0, 1000000, 0, 1000)
 max_harga = st.number_input("Filter harga maksimal", 0, 1000000, 1000000, 1000)
 top_n = st.slider("Jumlah rekomendasi", 1, 10, 5)
 
-if kata_kunci:
-    hasil, relevance = recommend_places(kata_kunci, min_rating, min_harga, max_harga, top_n)
-
-    if not hasil.empty:
-        st.subheader("Hasil Rekomendasi")
-        st.dataframe(hasil[['Nama Wisata', 'Lokasi', 'Rating', 'Harga', 'Skor Kemiripan']])
-
-        # Visualisasi skor kemiripan
-        st.subheader("Visualisasi Skor Kemiripan")
-        fig = plot_similarity(hasil['Skor Kemiripan'].tolist(), hasil['Nama Wisata'].tolist())
-        st.pyplot(fig)
-
-        # Evaluasi rekomendasi
-        eval_metrics = evaluate_recommendation(relevance, k=top_n)
-        st.subheader("Evaluasi Rekomendasi")
-        st.write(eval_metrics)
+if st.button("Cari Rekomendasi"):
+    if not kata_kunci:
+        st.warning("Silakan masukkan kata kunci terlebih dahulu.")
     else:
-        st.write("Maaf, tidak ditemukan rekomendasi yang sesuai.")
+        hasil, ground_truth = recommend_places(kata_kunci, min_rating, min_harga, max_harga, top_n)
+        if hasil.empty:
+            st.error("Tempat tidak ditemukan. Coba kata kunci atau filter lain.")
+        else:
+            st.success(f"{len(hasil)} tempat wisata direkomendasikan.")
+            st.dataframe(hasil)
+
+            # Fungsi rata-rata similarity score
+            def average_similarity_score(df_hasil):
+                if "Skor Kemiripan" in df_hasil.columns and not df_hasil.empty:
+                    return round(df_hasil["Skor Kemiripan"].mean(), 3)
+                return 0.0
+
+            avg_score = average_similarity_score(hasil)
+            st.info(f"🔍 Rata-rata Skor Kemiripan: {avg_score}")
+
+            # Visualisasi bar chart skor kemiripan
+            st.subheader("📊 Visualisasi Skor Kemiripan")
+            st.bar_chart(hasil.set_index("Nama Wisata")["Skor Kemiripan"])
+
+            # Precision & Recall sederhana
+            relevan = sum(ground_truth)
+            total = len(ground_truth)
+            precision = relevan / total if total > 0 else 0
+            recall = relevan / (relevan + 1e-5)
+
+            st.subheader("📈 Evaluasi Rekomendasi")
+            st.write(f"**Precision**: {precision:.2f}")
+            st.write(f"**Recall**: {recall:.2f}")
+
+            # Evaluasi lanjutan (MAP, NDCG, dll)
+            eval_result = evaluate_recommendation(ground_truth, top_n)
+            for metric, score in eval_result.items():
+                st.write(f"**{metric}**: {score}")
