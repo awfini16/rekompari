@@ -127,6 +127,17 @@ def evaluate_recommendation(relevance_list, k=5):
         'MAP': round(ap, 3),
         f'NDCG@{k}': round(ndcg, 3)
     }
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def plot_similarity(scores, labels):
+    fig, ax = plt.subplots(figsize=(10, 1.5))
+    sns.heatmap([scores], annot=True, fmt=".3f", cmap="YlGnBu", cbar=True, xticklabels=labels, ax=ax)
+    ax.set_title("Skor Kemiripan Tempat Rekomendasi", fontsize=14)
+    ax.set_yticks([])
+    plt.xticks(rotation=30, ha='right')
+    return fig
+
 
 # -----------------------------
 # STREAMLIT UI
@@ -139,26 +150,7 @@ min_harga = st.number_input("Filter harga minimal", 0, 1000000, 0, 1000)
 max_harga = st.number_input("Filter harga maksimal", 0, 1000000, 1000000, 1000)
 top_n = st.slider("Jumlah rekomendasi", 1, 10, 5)
 
-if st.button("Cari Rekomendasi"):
-    if not kata_kunci:
-        st.warning("Silakan masukkan kata kunci terlebih dahulu.")
-    else:
-        hasil, ground_truth = recommend_places(kata_kunci, min_rating, min_harga, max_harga, top_n)
-        if hasil.empty:
-            st.error("Tempat tidak ditemukan. Coba kata kunci atau filter lain.")
-        else:
-            st.success(f"{len(hasil)} tempat wisata direkomendasikan.")
-            st.dataframe(hasil)
-
-            relevan = sum(ground_truth)
-            total = len(ground_truth)
-            precision = relevan / total if total > 0 else 0
-            recall = relevan / (relevan + 1e-5)
-
-            st.subheader("📊 Evaluasi Rekomendasi")
-            st.write(f"**Precision**: {precision:.2f}")
-            st.write(f"**Recall**: {recall:.2f}")
-
-            eval_result = evaluate_recommendation(ground_truth, top_n)
-            for metric, score in eval_result.items():
-                st.write(f"**{metric}**: {score}")
+# Visualisasi skor kemiripan
+st.subheader("Visualisasi Skor Kemiripan")
+fig = plot_similarity(hasil['Skor Kemiripan'].tolist(), hasil['Nama Wisata'].tolist())
+st.pyplot(fig)
