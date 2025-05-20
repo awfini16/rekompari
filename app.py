@@ -143,6 +143,8 @@ def plot_similarity(scores, labels):
 # -----------------------------
 # STREAMLIT UI
 # -----------------------------
+# ... kode kamu sebelumnya tetap sama sampai bagian Streamlit UI
+
 st.title("🗺️ Sistem Rekomendasi Tempat Wisata - Jawa Timur")
 
 kata_kunci = st.text_input("Masukkan kata kunci/nama tempat wisata (misal: 'Papuma')", "")
@@ -151,7 +153,21 @@ min_harga = st.number_input("Filter harga minimal", 0, 1000000, 0, 1000)
 max_harga = st.number_input("Filter harga maksimal", 0, 1000000, 1000000, 1000)
 top_n = st.slider("Jumlah rekomendasi", 1, 10, 5)
 
-# Visualisasi skor kemiripan
-st.subheader("Visualisasi Skor Kemiripan")
-fig = plot_similarity(hasil['Skor Kemiripan'].tolist(), hasil['Nama Wisata'].tolist())
-st.pyplot(fig)
+if kata_kunci:
+    hasil, relevance = recommend_places(kata_kunci, min_rating, min_harga, max_harga, top_n)
+
+    if not hasil.empty:
+        st.subheader("Hasil Rekomendasi")
+        st.dataframe(hasil[['Nama Wisata', 'Lokasi', 'Rating', 'Harga', 'Skor Kemiripan']])
+
+        # Visualisasi skor kemiripan
+        st.subheader("Visualisasi Skor Kemiripan")
+        fig = plot_similarity(hasil['Skor Kemiripan'].tolist(), hasil['Nama Wisata'].tolist())
+        st.pyplot(fig)
+
+        # Evaluasi rekomendasi
+        eval_metrics = evaluate_recommendation(relevance, k=top_n)
+        st.subheader("Evaluasi Rekomendasi")
+        st.write(eval_metrics)
+    else:
+        st.write("Maaf, tidak ditemukan rekomendasi yang sesuai.")
