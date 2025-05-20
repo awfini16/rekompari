@@ -158,9 +158,9 @@ if st.button("Cari Rekomendasi"):
             precision = relevan / total if total > 0 else 0
             recall = relevan / (relevan + 1e-5)
 
-            st.subheader("📈 Evaluasi Rekomendasi")
-            st.write(f"**Precision**: {precision:.2f}")
-            st.write(f"**Recall**: {recall:.2f}")
+            #st.subheader("📈 Evaluasi Rekomendasi")
+            #st.write(f"**Precision**: {precision:.2f}")
+            #st.write(f"**Recall**: {recall:.2f}")
 
             # Evaluasi lanjutan (MAP, NDCG, dll)
             eval_result = evaluate_recommendation(ground_truth, top_n)
