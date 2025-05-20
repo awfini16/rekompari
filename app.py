@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import re
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
@@ -127,8 +129,7 @@ def evaluate_recommendation(relevance_list, k=5):
         'MAP': round(ap, 3),
         f'NDCG@{k}': round(ndcg, 3)
     }
-import matplotlib.pyplot as plt
-import seaborn as sns
+
 
 def plot_similarity(scores, labels):
     fig, ax = plt.subplots(figsize=(10, 1.5))
